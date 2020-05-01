@@ -965,10 +965,11 @@ public class ClientRenderHooks
 				
 				mc.fontRenderer.drawString("Speed: " + speed + " chunks per hour", 2, 2, 0xffffff);
 				
-				if(FlansMod.DEBUG)
-				{
-					mc.fontRenderer.drawString("Throttle : " + ent.throttle, 2, 12, 0xffffff);
-				}
+				//Throttle should be displayed any time
+				//if(FlansMod.DEBUG)
+				//{
+				mc.fontRenderer.drawString("Throttle : " + ent.throttle, 2, 12, 0xffffff);
+				//}
 			}
 		}
 	}

@@ -1,5 +1,6 @@
 package com.flansmod.common.driveables;
 
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.MoverType;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -192,7 +193,7 @@ public class EntityPlane extends EntityDriveable
 		{
 			case 0: //Accelerate : Increase the throttle, up to 1.
 			{
-				if(forward == true && canThrust || throttle < 0F)
+				if(forward == true && canThrust || throttle < 0F && canThrust)
 				{
 					throttle += 0.002F;
 					if(throttle > 1F)
@@ -202,13 +203,18 @@ public class EntityPlane extends EntityDriveable
 			}
 			case 1: //Decelerate : Decrease the throttle, down to -1, or 0 if the plane cannot reverse
 			{
-				if(forward == false && canThrust || throttle > 0F)
+				if((0F > throttle && throttle > -0.02F && forward == false && canThrust) || throttle > 0F )
 				{
+					//Original Plane
 					throttle -= 0.005F;
 					if(throttle < -1F)
 						throttle = -1F;
+					/*
 					if(throttle < 0F && type.maxNegativeThrottle == 0F)
 						throttle = 0F;
+						*/
+					//made also static because i dont want to live anymore
+					
 				}
 				return true;
 			}
@@ -477,8 +483,12 @@ public class EntityPlane extends EntityDriveable
 		
 		float throttleScaled = 0.01F * (type.maxThrottle + (data.engine == null ? 0 : data.engine.engineSpeed));
 		
+		//for driving backwards
+		float backwardsthrottleScaled = 0.01F * (type.maxNegativeThrottle + (data.engine == null ? 0 : data.engine.engineSpeed));
+		
 		if(!canThrust())
 			throttleScaled = 0;
+			backwardsthrottleScaled = 0;
 		
 		int numPropsWorking = 0;
 		int numProps = 0;
@@ -531,64 +541,132 @@ public class EntityPlane extends EntityDriveable
 				break;
 			
 			case PLANE:
-				//Count the number of working propellers
-				for(Propeller prop : type.propellers)
-					if(isPartIntact(prop.planePart))
-						numPropsWorking++;
-				numProps = type.propellers.size();
+				//difference between forward and backwards
+				if(throttle > 0) {
+					
+					//Count the number of working propellers
+					for(Propeller prop : type.propellers)
+						if(isPartIntact(prop.planePart))
+							numPropsWorking++;
+					numProps = type.propellers.size();
+					
+					float throttleTemp = throttle * (numProps == 0 ? 0 : (float)numPropsWorking / numProps * 2F);
+					
+					//Apply forces
+					Vector3f forwards = (Vector3f)axes.getXAxis().normalise();
+					
+					//Sanity limiter
+					if(lastTickSpeed > 2F)
+						lastTickSpeed = 2F;
+					
+					float newSpeed = lastTickSpeed + throttleScaled * 2F;
+					
+					//Calculate the amount to alter motion by
+					float proportionOfMotionToCorrect = 2F * throttleTemp - 0.5F;
+					if(proportionOfMotionToCorrect < throttle * 0.25f)
+						proportionOfMotionToCorrect = throttle * 0.25f;
+					if(proportionOfMotionToCorrect > 0.6F)
+						proportionOfMotionToCorrect = 0.6F;
+					
+					//Apply gravity
+					g = 0.98F / 20F;
+					motionY -= g;
+					
+					//Apply lift
+					int numWingsIntact = 0;
+					if(isPartIntact(EnumDriveablePart.rightWing)) numWingsIntact++;
+					if(isPartIntact(EnumDriveablePart.leftWing)) numWingsIntact++;
+					
+					float amountOfLift = 2F * g * throttleTemp * numWingsIntact / 2F;
+					if(amountOfLift > g)
+						amountOfLift = g;
+					
+					if(!isPartIntact(EnumDriveablePart.tail))
+						amountOfLift *= 0.75F;
+					
+					motionY += amountOfLift;
+					
+					//Cut out some motion for correction
+					motionX *= 1F - proportionOfMotionToCorrect;
+					motionY *= 1F - proportionOfMotionToCorrect;
+					motionZ *= 1F - proportionOfMotionToCorrect;
+					
+					//Add the corrected motion
+					motionX += proportionOfMotionToCorrect * newSpeed * forwards.x;
+					motionY += proportionOfMotionToCorrect * newSpeed * forwards.y;
+					motionZ += proportionOfMotionToCorrect * newSpeed * forwards.z;
+					
+					//Apply drag
+					motionX *= drag;
+					motionY *= drag;
+					motionZ *= drag;
+					
+					data.fuelInTank -= throttleScaled * fuelConsumptionMultiplier * data.engine.fuelConsumption;
+				}
+				if (throttle < 0) {
+					//just 5 chunks or so per hour because i spent way too many time trying to do it non-static 
+					
+					//Count the number of working propellers
+					for(Propeller prop : type.propellers)
+						if(isPartIntact(prop.planePart))
+							numPropsWorking++;
+					numProps = type.propellers.size();
+					
+					float throttleTemp = throttle * (numProps == 0 ? 0 : (float)numPropsWorking / numProps * 2F);
+					
+					//Apply forces
+					Vector3f forwards = (Vector3f)axes.getXAxis().normalise();
+					
+					//Sanity limiter
+					if(lastTickSpeed > 2F)
+						lastTickSpeed = 2F;
+					
+					float newSpeed = lastTickSpeed + throttleScaled * 2F;
+					
+					//Calculate the amount to alter motion by
+					float proportionOfMotionToCorrect = 2F * throttleTemp - 0.5F;
+					if(proportionOfMotionToCorrect < throttle * 0.25f)
+						proportionOfMotionToCorrect = throttle * 0.25f;
+					if(proportionOfMotionToCorrect > 0.6F)
+						proportionOfMotionToCorrect = 0.6F;
+					
+					//Apply gravity
+					g = 0.98F / 20F;
+					motionY -= g;
+					
+					//Apply lift
+					int numWingsIntact = 0;
+					if(isPartIntact(EnumDriveablePart.rightWing)) numWingsIntact++;
+					if(isPartIntact(EnumDriveablePart.leftWing)) numWingsIntact++;
+					
+					float amountOfLift = 2F * g * throttleTemp * numWingsIntact / 2F;
+					if(amountOfLift > g)
+						amountOfLift = g;
+					
+					if(!isPartIntact(EnumDriveablePart.tail))
+						amountOfLift *= 0.75F;
+					
+					motionY += amountOfLift;
+					
+					//Cut out some motion for correction
+					motionX *= 1F - proportionOfMotionToCorrect;
+					motionY *= 1F - proportionOfMotionToCorrect;
+					motionZ *= 1F - proportionOfMotionToCorrect;
+					
+					//Add the corrected motion
+					motionX += proportionOfMotionToCorrect * newSpeed * forwards.x;
+					motionY += proportionOfMotionToCorrect * newSpeed * forwards.y;
+					motionZ += proportionOfMotionToCorrect * newSpeed * forwards.z;
+					
+					//Apply drag
+					motionX *= drag;
+					motionY *= drag;
+					motionZ *= drag;
+					
+					data.fuelInTank -= throttleScaled * fuelConsumptionMultiplier * data.engine.fuelConsumption;
+				}
 				
-				float throttleTemp = throttle * (numProps == 0 ? 0 : (float)numPropsWorking / numProps * 2F);
 				
-				//Apply forces
-				Vector3f forwards = (Vector3f)axes.getXAxis().normalise();
-				
-				//Sanity limiter
-				if(lastTickSpeed > 2F)
-					lastTickSpeed = 2F;
-				
-				float newSpeed = lastTickSpeed + throttleScaled * 2F;
-				
-				//Calculate the amount to alter motion by
-				float proportionOfMotionToCorrect = 2F * throttleTemp - 0.5F;
-				if(proportionOfMotionToCorrect < throttle * 0.25f)
-					proportionOfMotionToCorrect = throttle * 0.25f;
-				if(proportionOfMotionToCorrect > 0.6F)
-					proportionOfMotionToCorrect = 0.6F;
-				
-				//Apply gravity
-				g = 0.98F / 20F;
-				motionY -= g;
-				
-				//Apply lift
-				int numWingsIntact = 0;
-				if(isPartIntact(EnumDriveablePart.rightWing)) numWingsIntact++;
-				if(isPartIntact(EnumDriveablePart.leftWing)) numWingsIntact++;
-				
-				float amountOfLift = 2F * g * throttleTemp * numWingsIntact / 2F;
-				if(amountOfLift > g)
-					amountOfLift = g;
-				
-				if(!isPartIntact(EnumDriveablePart.tail))
-					amountOfLift *= 0.75F;
-				
-				motionY += amountOfLift;
-				
-				//Cut out some motion for correction
-				motionX *= 1F - proportionOfMotionToCorrect;
-				motionY *= 1F - proportionOfMotionToCorrect;
-				motionZ *= 1F - proportionOfMotionToCorrect;
-				
-				//Add the corrected motion
-				motionX += proportionOfMotionToCorrect * newSpeed * forwards.x;
-				motionY += proportionOfMotionToCorrect * newSpeed * forwards.y;
-				motionZ += proportionOfMotionToCorrect * newSpeed * forwards.z;
-				
-				//Apply drag
-				motionX *= drag;
-				motionY *= drag;
-				motionZ *= drag;
-				
-				data.fuelInTank -= throttleScaled * fuelConsumptionMultiplier * data.engine.fuelConsumption;
 				break;
 			default:
 				break;
