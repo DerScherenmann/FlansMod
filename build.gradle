@@ -1,6 +1,7 @@
 buildscript {
     dependencies {
         classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.4'
     }
     repositories {
         jcenter()
@@ -11,9 +12,11 @@ buildscript {
         }
     }
 }
-apply plugin: 'net.minecraftforge.gradle.forge'
 
-version = version_major + "." + version_minor + version_identifier + "." + version_patch
+apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+version = version_major + "." + version_minor + "." + version_patch + version_extra
 group = "com.flansmod"
 archivesBaseName = "Flan's Mod"
 
@@ -24,11 +27,16 @@ compileJava {
     sourceCompatibility = targetCompatibility = '1.8'
 }
 
+dependencies {
+    compile "io.vavr:vavr:0.10.2"
+    shadow "io.vavr:vavr:0.10.2"
+}
+
 minecraft {
     version = minecraft_version + "-" + forge_version
     runDir = "run"
 
-    replace "@ALLOWED_VERSIONS@", "[5.6, 5.7)"
+    replace "@ALLOWED_VERSIONS@", "[5.6.0-beta, 5.7)"
     replace "@VERSION@", project.version
     replaceIn "FlansMod.java"
 
@@ -37,6 +45,8 @@ minecraft {
     replaceIn "FlansModApocalypse.java"
 
     mappings = "stable_39"
+    //if this is required, it should be enabled locally for selected runs. These runs will take about 10 seconds longer
+    makeObfSourceJar = false
 }
 
 processResources {
@@ -149,7 +159,7 @@ task clearOutput(type: Delete) {
 
 task outputJar(type: Jar) {
     destinationDir = new File("build/output/mods/")
-    from(zipTree("build/libs/${archiveName}")) {
+    from(zipTree("build/libs/${archivesBaseName}-${version}-all.jar")) {
         exclude '**/apocalypse/'
         exclude '**/mw/'
         exclude '**/nerf/'
@@ -169,7 +179,20 @@ task outputPacks(type: Copy) {
     into 'build/output/Flan/'
 }
 
+shadowJar {
+    configurations = [project.configurations.shadow]
+}
+
+reobf {
+    shadowJar {
+        mappingType = "SEARGE"
+    }
+}
+
+tasks.reobfShadowJar.mustRunAfter shadowJar
+
 build {
+    dependsOn reobfShadowJar
     dependsOn contentPacks
     dependsOn clearOutput
     dependsOn outputJar
