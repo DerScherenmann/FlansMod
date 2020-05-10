@@ -1,9 +1,10 @@
 package com.flansmod.client;
 
+import java.awt.Color;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-
 import org.jline.utils.Log;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
@@ -64,9 +65,14 @@ import com.flansmod.client.util.WorldRenderer;
 import com.flansmod.common.FlansMod;
 import com.flansmod.common.PlayerData;
 import com.flansmod.common.PlayerHandler;
+import com.flansmod.common.driveables.DriveablePart;
 import com.flansmod.common.driveables.EntityDriveable;
 import com.flansmod.common.driveables.EntityPlane;
 import com.flansmod.common.driveables.EntitySeat;
+import com.flansmod.common.driveables.EnumDriveablePart;
+import com.flansmod.common.driveables.EnumWeaponType;
+import com.flansmod.common.driveables.PlaneType;
+import com.flansmod.common.guns.BulletType;
 import com.flansmod.common.guns.GunType;
 import com.flansmod.common.guns.ItemGun;
 import com.flansmod.common.network.PacketTeamInfo;
@@ -665,10 +671,11 @@ public class ClientRenderHooks
 		}
 		if(!event.isCancelable() && event.getType() == ElementType.HOTBAR)
 		{
+			renderVehicleInstruments(tessellator,i,j);
 			renderPlayerAmmo(i, j);
 			renderTeamInfo(tessellator, i, j);
 			renderKillMessages(i, j);
-			renderVehicleDebug();
+			renderVehicleDebug();	
 		}
 	}
 	
@@ -970,12 +977,225 @@ public class ClientRenderHooks
 				
 				mc.fontRenderer.drawString("Speed: " + speed + " chunks per hour", 2, 2, 0xffffff);
 				
-				//Throttle should be displayed any time
-				//if(FlansMod.DEBUG)
-				//{
-				mc.fontRenderer.drawString("Throttle : " + ent.throttle, 2, 12, 0xffffff);
-				//}
 			}
+		}
+	}
+	
+	private void renderVehicleInstruments(Tessellator tessellator, int i, int j) {
+		
+		if(mc.player.getRidingEntity() instanceof EntitySeat)
+		{
+			EntityDriveable ent = ((EntitySeat)mc.player.getRidingEntity()).driveable;
+			
+			if(ent != null)
+			{
+				//Throttle should be displayed any time
+				mc.fontRenderer.drawString("Throttle : " + ent.throttle, 2, 12, 0xffffff);
+				
+				if(ent.getDriveableType().getClass() == PlaneType.class && !ent.gearDown() && mc.gameSettings.thirdPersonView == 0) {
+					
+					//we can cast this
+					EntityPlane plane = (EntityPlane) ent;
+					
+					//FlansMod.log.info("Drawing HUD/Instruments");
+					
+					double speed = ent.getSpeed();
+					
+					double width = 20;
+					double x = i/12;
+					double y = j - j/2;
+					
+					double heightBombBackground = 20;
+					double heightBombInstrument = heightBombBackground;		
+					
+					double distanceItem = 5;
+					double widthItem = width;
+					
+					float indicatorScale = 0.4F;
+					double indicatorHeight = 256 * indicatorScale;
+					double indicatorWidth = 256 * indicatorScale;
+					
+					double distanceHUD = 5;
+					double widthAll = 2*distanceHUD + 2*width + distanceItem + indicatorWidth - 50;
+					double heightAll = 2* distanceHUD + heightBombBackground + indicatorHeight;
+						
+					float tickdelay = ent.shootDelaySecondary;
+					if(tickdelay != 0) heightBombInstrument = heightBombBackground * (tickdelay / ent.getDriveableType().shootDelaySecondary);	
+
+					WorldRenderer worldrenderer = FlansModClient.getWorldRenderer();
+					
+					GlStateManager.pushMatrix();
+					
+					/*
+					 * Draw HUD Box
+					 */
+					GlStateManager.color(0F, 1F, 0F);
+					worldrenderer.startDrawingLines();
+					//top
+					worldrenderer.addVertexWithUV(x-distanceHUD, y - distanceHUD, -80D,0, 0);
+					worldrenderer.addVertexWithUV(x + widthAll, y - distanceHUD, -80D, 0, 0);
+					//right
+					worldrenderer.addVertexWithUV(x + widthAll, y - distanceHUD, -80D,0, 0);
+					worldrenderer.addVertexWithUV(x + widthAll, y + heightAll, -80D, 0, 0);
+					//bottom
+					worldrenderer.addVertexWithUV(x - distanceHUD, y + heightAll, -80D,0, 0);
+					worldrenderer.addVertexWithUV(x + widthAll, y + heightAll, -80D, 0, 0);
+					//left
+					worldrenderer.addVertexWithUV(x - distanceHUD, y - distanceHUD, -80D,0, 0);
+					worldrenderer.addVertexWithUV(x - distanceHUD, y + heightAll, -80D, 0, 0);
+					worldrenderer.draw();
+					
+					/*
+					 * Draw secFire reload Timer
+					 */
+					worldrenderer.startDrawingQuads();
+					worldrenderer.addVertexWithUV(x, y + heightBombInstrument, -80D,0, 0);
+					worldrenderer.addVertexWithUV(x + width, y + heightBombInstrument, -80D, 0, 0);
+					worldrenderer.addVertexWithUV(x+ width, y, -80D, 0, 0);
+					worldrenderer.addVertexWithUV(x, y, -80D, 0, 0);
+					worldrenderer.draw();
+					
+					/*
+					 * Draw secFire image
+					 */	
+					int remaining = 0;
+					if(EnumWeaponType.MISSILE == ent.getDriveableType().weaponType(true)) {		
+						for(BulletType bullet:ent.getDriveableType().ammo) {
+							if(bullet.weaponType == EnumWeaponType.MISSILE) {			
+								mc.renderEngine.bindTexture(FlansModResourceHandler.getIcon(bullet));
+							}
+						}
+									
+						worldrenderer.startDrawingQuads();
+						worldrenderer.addVertexWithUV(x + width + distanceItem, y + width, -80D,0.0, 1.0);
+						worldrenderer.addVertexWithUV(x + width + widthItem + distanceItem, y + width, -80D, 1.0, 1.0);
+						worldrenderer.addVertexWithUV(x + width + widthItem + distanceItem, y, -80D, 1.0, 0.0);
+						worldrenderer.addVertexWithUV(x + width + distanceItem, y, -80D, 0.0, 0.0);
+						worldrenderer.draw();
+					}
+					if(EnumWeaponType.BOMB == ent.getDriveableType().weaponType(true)) {		
+						for(BulletType bullet:ent.getDriveableType().ammo) {
+							if(bullet.weaponType == EnumWeaponType.BOMB) {			
+								mc.renderEngine.bindTexture(FlansModResourceHandler.getIcon(bullet));
+							}
+						}			
+						
+						worldrenderer.startDrawingQuads();
+						worldrenderer.addVertexWithUV(x + width + distanceItem, y + width, -80D,0.0, 1.0);
+						worldrenderer.addVertexWithUV(x + width + widthItem + distanceItem, y + width, -80D, 1.0, 1.0);
+						worldrenderer.addVertexWithUV(x + width + widthItem + distanceItem, y, -80D, 1.0, 0.0);
+						worldrenderer.addVertexWithUV(x + width + distanceItem, y, -80D, 0.0, 0.0);
+						worldrenderer.draw();
+					}
+					
+					mc.fontRenderer.drawString(Integer.toString(remaining), (int) (x + width + widthItem), (int) (y), 0x00ff00);
+					
+					/*
+					 * Draw Damage Indicator
+					 */
+					
+					//draw texture 
+					ResourceLocation indicator = new ResourceLocation("flansmod","gui/v2_3.png");
+					mc.renderEngine.bindTexture(indicator);		
+					GlStateManager.enableRescaleNormal();
+					GlStateManager.color(1F, 1F, 1F);
+					worldrenderer.startDrawingQuads();
+					worldrenderer.addVertexWithUV(x , y + heightAll - distanceHUD, -80D,0, 1);
+					worldrenderer.addVertexWithUV(x + (1*indicatorWidth), y + heightAll - distanceHUD, -80D, 1, 1);
+					worldrenderer.addVertexWithUV(x + (1*indicatorWidth), y + heightAll - distanceHUD - indicatorHeight, -80D, 1, 0.0);
+					worldrenderer.addVertexWithUV(x, y + heightAll - distanceHUD - indicatorHeight, -80D, 0, 0.0);
+					worldrenderer.draw();	
+					GlStateManager.scale(indicatorScale, indicatorScale, indicatorScale);
+					GlStateManager.resetColor();
+					GlStateManager.disableRescaleNormal();
+					
+					GlStateManager.popMatrix();
+
+					//new opengl stack
+					GlStateManager.pushMatrix();
+					GlStateManager.color(1F,1F,1F);
+					GlStateManager.scale(0.5F, 0.5F, 0.5F);
+					GlStateManager.translate(1F, 1F, 0);
+					
+					//get damage of parts
+					HashMap<EnumDriveablePart, DriveablePart> parts = ent.getDriveableData().parts;
+					
+					float noseHealthFactor = 0;
+					float coreHealthFactor = 0;
+					float lefWingHealthFactor = 0;
+					float rightWingHealthFactor = 0;
+					float tailHealthFactor = 0;
+					
+					for(EnumDriveablePart part:parts.keySet()) {	
+						if(EnumDriveablePart.nose == part) {
+							noseHealthFactor = (float) parts.get(part).health / (float) parts.get(part).maxHealth;
+							float redIn = 1F - (1F*noseHealthFactor);
+							float greenIn = 1F*noseHealthFactor;		
+							Color colorConverter = new Color(redIn, greenIn, 0F,1F);
+							int red = colorConverter.getRed();
+							int green = colorConverter.getGreen();
+							String color = Integer.toHexString(red).replace("0", "00") + Integer.toHexString(green).replace("0x", "").replace("0","00") + "00";
+							mc.fontRenderer.drawString("Nose: " + Integer.toString(parts.get(part).health)+"/"+ Integer.toString(parts.get(part).maxHealth), (int) (x+indicatorWidth), j - j/2, Integer.parseInt(color, 16));
+						}
+						if(EnumDriveablePart.core == part) {
+							coreHealthFactor = (float) parts.get(part).health / (float) parts.get(part).maxHealth;
+							float redIn = 1F - (1F*coreHealthFactor);
+							float greenIn = 1F*coreHealthFactor;	
+							Color colorConverter = new Color(redIn, greenIn, 0F,1F);
+							int red = colorConverter.getRed();
+							int green = colorConverter.getGreen();
+							String color = Integer.toHexString(red).replace("0", "00") + Integer.toHexString(green).replace("0x", "").replace("0","00") + "00";
+							mc.fontRenderer.drawString("Core: " + Integer.toString(parts.get(part).health)+"/"+ Integer.toString(parts.get(part).maxHealth), (int) (x+indicatorWidth), j - j/2 + 12, Integer.parseInt(color, 16));
+						}
+						if(EnumDriveablePart.leftWing == part) {
+							lefWingHealthFactor = (float) parts.get(part).health / (float) parts.get(part).maxHealth;
+							float redIn = 1F - (1F*lefWingHealthFactor);
+							float greenIn = 1F*lefWingHealthFactor;		
+							Color colorConverter = new Color(redIn, greenIn, 0F,1F);
+							int red = colorConverter.getRed();
+							int green = colorConverter.getGreen();
+							String color = Integer.toHexString(red).replace("0", "00") + Integer.toHexString(green).replace("0x", "").replace("0","00") + "00";
+							mc.fontRenderer.drawString("Left Wing: " + Integer.toString(parts.get(part).health)+"/"+ Integer.toString(parts.get(part).maxHealth), (int) (x+indicatorWidth), j - j/2 + 24, Integer.parseInt(color, 16));
+						}
+						if(EnumDriveablePart.rightWing == part) {
+							rightWingHealthFactor = (float) parts.get(part).health / (float) parts.get(part).maxHealth;
+							float redIn = 1F - (1F*rightWingHealthFactor);
+							float greenIn = 1F*rightWingHealthFactor;		
+							Color colorConverter = new Color(redIn, greenIn, 0F,1F);
+							int red = colorConverter.getRed();
+							int green = colorConverter.getGreen();
+							String color = Integer.toHexString(red).replace("0", "00") + Integer.toHexString(green).replace("0x", "").replace("0","00") + "00";
+							mc.fontRenderer.drawString("Right Wing: " + Integer.toString(parts.get(part).health)+"/"+ Integer.toString(parts.get(part).maxHealth), (int) (x+indicatorWidth), j - j/2 + 36, Integer.parseInt(color, 16));
+						}
+						if(EnumDriveablePart.tail == part) {
+							tailHealthFactor = (float) parts.get(part).health / (float) parts.get(part).maxHealth;
+							float redIn = 1F - (1F*tailHealthFactor);
+							float greenIn = 1F*tailHealthFactor;		
+							Color colorConverter = new Color(redIn, greenIn, 0F,1F);
+							int red = colorConverter.getRed();
+							int green = colorConverter.getGreen();
+							String color = Integer.toHexString(red).replace("0", "00") + Integer.toHexString(green).replace("0x", "").replace("0","00") + "00";
+							mc.fontRenderer.drawString("Tail: " + Integer.toString(parts.get(part).health)+"/"+ Integer.toString(parts.get(part).maxHealth), (int) (x+indicatorWidth), j - j/2 + 48, Integer.parseInt(color, 16));
+						}
+					}
+					
+					GlStateManager.popMatrix();				
+					
+					if(FlansMod.DEBUG) {
+						mc.fontRenderer.drawString("Type : " + ent.getDriveableType().getClass(), 2, 22, 0xffffff);
+						mc.fontRenderer.drawString("Height : " + heightBombInstrument + " Delay : " + tickdelay, 2, 32, 0xffffff);	
+						FlansMod.log.debug("Height: " + heightBombInstrument + "\n"
+										+ " ShootDelay: " + tickdelay);
+						FlansMod.log.debug("Position HUD: x: " + x + " y:" + y);	
+						FlansMod.log.debug(ent.getDriveableType().shootDelaySecondary);
+					}
+					
+					
+				}else {
+					
+				}
+			}
+			
 		}
 	}
 	

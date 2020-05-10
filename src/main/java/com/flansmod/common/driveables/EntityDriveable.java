@@ -36,6 +36,7 @@ import net.minecraft.world.GameType;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import net.minecraftforge.fml.relauncher.Side;
@@ -585,6 +586,7 @@ public abstract class EntityDriveable extends Entity implements IControllable, I
 				}
 			}
 		}
+		
 	}
 	
 	private boolean driverIsCreative()
@@ -1162,6 +1164,9 @@ public abstract class EntityDriveable extends Entity implements IControllable, I
 			shootDelayPrimary--;
 		if(shootDelaySecondary > 0)
 			shootDelaySecondary--;
+		if(FlansMod.DEBUG) {
+			//FlansMod.log.debug(shootDelaySecondary);
+		}
 		if(!world.isRemote)
 		{
 			if(primaryShootHeld && getDriveableType().modePrimary == EnumFireMode.FULLAUTO)

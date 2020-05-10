@@ -56,6 +56,8 @@ import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityRegistry;
 import net.minecraftforge.fml.common.registry.GameRegistry;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 import com.flansmod.client.debug.EntityDebugDot;
 import com.flansmod.client.debug.EntityDebugVector;
@@ -73,6 +75,8 @@ import com.flansmod.common.driveables.mechas.ItemMechaAddon;
 import com.flansmod.common.driveables.mechas.MechaItemType;
 import com.flansmod.common.driveables.mechas.MechaType;
 import com.flansmod.common.eventhandlers.PlayerDeathEventListener;
+import com.flansmod.common.eventhandlers.PlayerInteractEventListeners;
+import com.flansmod.common.eventhandlers.RenderHandEventListeners;
 import com.flansmod.common.guns.AAGunType;
 import com.flansmod.common.guns.AttachmentType;
 import com.flansmod.common.guns.BulletType;
@@ -285,8 +289,13 @@ public class FlansMod
 		//Config
 		//Starting the EventListener
 		new PlayerDeathEventListener();
+		new PlayerInteractEventListeners();
+		//new RenderHandEventListeners();
+
+		
 		log.info("Loading complete.");
 	}
+	
 	
 	@SubscribeEvent
 	public void registerRecipes(RegistryEvent.Register<IRecipe> event)

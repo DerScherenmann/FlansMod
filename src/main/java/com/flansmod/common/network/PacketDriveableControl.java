@@ -8,6 +8,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+import com.flansmod.client.ClientRenderHooks;
 import com.flansmod.common.driveables.EntityDriveable;
 import com.flansmod.common.driveables.EntityPlane;
 import com.flansmod.common.driveables.EntityVehicle;
@@ -22,6 +23,8 @@ public class PacketDriveableControl extends PacketBase
 	public float throttle;
 	public float fuelInTank;
 	public float steeringYaw;
+	public float shootDelaySecondary;
+	public float shootDelayPrimary;
 	
 	public PacketDriveableControl()
 	{
@@ -54,6 +57,7 @@ public class PacketDriveableControl extends PacketBase
 			EntityPlane plane = (EntityPlane)driveable;
 			steeringYaw = plane.flapsYaw;
 		}
+		shootDelaySecondary = driveable.getShootDelay(true);
 	}
 	
 	@Override
@@ -75,6 +79,7 @@ public class PacketDriveableControl extends PacketBase
 		data.writeFloat(throttle);
 		data.writeFloat(fuelInTank);
 		data.writeFloat(steeringYaw);
+		data.writeFloat(shootDelaySecondary);
 	}
 	
 	@Override
@@ -96,6 +101,7 @@ public class PacketDriveableControl extends PacketBase
 		throttle = data.readFloat();
 		fuelInTank = data.readFloat();
 		steeringYaw = data.readFloat();
+		shootDelaySecondary = data.readFloat();
 	}
 	
 	@Override
@@ -136,6 +142,8 @@ public class PacketDriveableControl extends PacketBase
 			{
 				driveable = (EntityDriveable)obj;
 				driveable.driveableData.fuelInTank = fuelInTank;
+				//implemented: send delay to client
+				driveable.shootDelaySecondary = shootDelaySecondary;
 				if(driveable.getSeat(0) != null && driveable.getSeat(0).getControllingPassenger() == clientPlayer)
 					return;
 				break;
