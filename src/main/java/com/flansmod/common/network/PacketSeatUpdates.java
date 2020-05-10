@@ -50,6 +50,11 @@ public class PacketSeatUpdates extends PacketBase
 	@Override
 	public void handleServerSide(EntityPlayerMP playerEntity)
 	{
+		if(playerEntity == null)
+		{
+			FlansMod.log.warn("Received seat update packet from a null player, skipping!");
+			return ;
+		}
 		EntityDriveable driveable = null;
 		for(Object obj : playerEntity.world.loadedEntityList)
 		{
